@@ -59,7 +59,7 @@ jobs:
           then
             echo "::warning::You are running the release flow from branch $GITHUB_REF_NAME instead of the release branch ${{ inputs.release_tag }}, this can lead to unexpected results"
           fi
-          RELEASE_OPTS=("--verbose" "--gha-console")
+          RELEASE_OPTS=("--gha-console")
           # Increase verbosity when running with debug logging.
           if [[ "${ACTIONS_STEP_DEBUG:-}" == "true" ]]; then
             RELEASE_OPTS+=("--verbose")
