@@ -24,13 +24,21 @@ hub_repo = repository_rule(
 )
 
 _ARCHIVES = {
+    "presign_rom_ext": {
+        "url": "https://github.com/pamaury/ot-sku/releases/download/TEST_RELEASE_2/presign_rom_ext.tar.xz",
+        "sha256": "027d9b65e3111cb0160680c0ea5492506b70c3a5e70cb7cdb576a104e200793c"
+    },
     "presign_perso": {
         "url": "https://github.com/pamaury/ot-sku/releases/download/TEST_RELEASE_2/presign_perso.tar.xz",
         "sha256": "c2241a0f3df8469d67afe2ea39de2bc64d56e63304a68179eba5d64ea6d3c360"
     },
-    "presign_rom_ext": {
-        "url": "https://github.com/pamaury/ot-sku/releases/download/TEST_RELEASE_2/presign_rom_ext.tar.xz",
-        "sha256": "027d9b65e3111cb0160680c0ea5492506b70c3a5e70cb7cdb576a104e200793c"
+    "rom_ext_release": {
+        "url": "https://github.com/pamaury/ot-sku/releases/download/TEST_RELEASE_2/rom_ext_release.tar.xz",
+        "sha256": "8207d5bba743f56d13f64ed3d1ac3085e428c2ffde47eb3d40bbe9f702b6e584"
+    },
+    "perso_release": {
+        "url": "https://github.com/pamaury/ot-sku/releases/download/TEST_RELEASE_2/perso_release.tar.xz",
+        "sha256": "4bdfa5dfa2aa5dec697e843a0a6a56b62959caa000a70c0c081d2046dbc6f099"
     }
 }
 
