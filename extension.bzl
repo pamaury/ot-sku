@@ -28,6 +28,10 @@ _ARCHIVES = {
         "url": "https://github.com/pamaury/ot-sku/releases/download/TEST_RELEASE_PERSO/presign_perso.tar.xz",
         "sha256": "c2241a0f3df8469d67afe2ea39de2bc64d56e63304a68179eba5d64ea6d3c360",
     },
+    "perso_release": {
+        "url": "https://github.com/pamaury/ot-sku/releases/download/TEST_RELEASE_PERSO/perso_release.tar.xz",
+        "sha256": "f7d79703f17facc404e08b6d8a6985eb4ccdaba55f359d18c1c4f25d0ad58394",
+    },
 }
 
 def _extra_impl(mctx):
