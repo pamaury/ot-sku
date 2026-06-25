@@ -32,6 +32,14 @@ _ARCHIVES = {
         "url": "https://github.com/pamaury/ot-sku/releases/download/BUILD_TEST_2/presign_rom_ext.tar.xz",
         "sha256": "1c2f0de921caf1c86e549a848bb7268d318f2b1d6999944862462cefea0ba378",
     },
+    "rom_ext_release": {
+        "url": "https://github.com/pamaury/ot-sku/releases/download/TEST_RELEASE_2/rom_ext_release.tar.xz",
+        "sha256": "e55ea0427c206d98448e5975b53a89af910c2d8f35e183f1b6ef4af859e00dc8",
+    },
+    "perso_release": {
+        "url": "https://github.com/pamaury/ot-sku/releases/download/TEST_RELEASE_2/perso_release.tar.xz",
+        "sha256": "609ed3d7c2c6df4f8f3169e620b6ff4ead52c2d24a05b17318db374eb583098f",
+    },
 }
 
 def _extra_impl(mctx):
