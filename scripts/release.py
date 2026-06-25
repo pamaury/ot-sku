@@ -21,6 +21,13 @@ def print_info(pargs, msg):
         print(f"info: {msg}")
 
 
+def print_warning(pargs, msg):
+    if pargs.gha_console:
+        print(f"::warning::{msg}")
+    else:
+        print(f"warning: {msg}")
+
+
 def print_error(pargs, msg):
     if pargs.gha_console:
         print(f"::error::{msg}")
@@ -60,7 +67,7 @@ def parse_json(pargs, asset_msg, json_str):
         sys.exit(1)
 
 
-def modify_extension_bzl(pargs, extension_bzl, archives):
+def modify_extension_bzl(pargs, extension_bzl, archives, keep_entries=None):
     extension_ast = ast.parse(extension_bzl)
     # Look for an assignment to '_ARCHIVES'
     archives_assign = None
@@ -70,6 +77,30 @@ def modify_extension_bzl(pargs, extension_bzl, archives):
     if not archives_assign:
         print_error(pargs, "could not find assignement to _ARCHIVES in extension.bzl")
         sys.exit(1)
+
+    # If we want to keep some entries, we need to evaluate the original dictionary.
+    if keep_entries:
+        # Evaluate the original dictionary.
+        if not isinstance(archives_assign.value, ast.Dict):
+            print_error("Cannot update _ARCHIVES in extension.bzl: a dictionary was expected")
+            sys.exit(1)
+        # Note that `literal_eval` is safe, it will not execute any python code. The downside
+        # is that it only works for constants expressions but we know this is the case since
+        # the content of _ARCHIVES was generated in the presign step.
+        try:
+            old_archives = ast.literal_eval(archives_assign.value)
+        except Exception as e:
+            print_error(pargs, "cannot parse _ARCHIVES in extension.bzl")
+            print_group(pargs, "error", e)
+            print_group(
+                pargs, "content",
+                "\n".join(extension_bzl[archives_assign.lineno - 1:archives_assign.end_lineno])
+            )
+            sys.exit(1)
+
+        old_archives = {key: val for (key, val) in old_archives.items() if key in keep_entries}
+        archives = old_archives | archives
+
     # Use the AST info to remove the old assignment and create a new one.
     extension_bzl = extension_bzl.splitlines(True)
     extension_bzl[archives_assign.lineno - 1:archives_assign.end_lineno] = \
@@ -305,15 +336,6 @@ def run_buildifier_on(pargs, file_content):
 
 
 def create_presign_release(pargs):
-    # Check if a release already exists.
-    release_list = run_gh_or_exit(pargs, "cannot query release list", [
-        "release", "list", "-L", "1000"]).decode('utf-8').split()
-    # The format of each line of the output is:
-    # <tag> ...
-    if any(release.split()[0] == pargs.tag for release in release_list):
-        print_info(pargs, f"release {pargs.tag} already exists, skipping build")
-        return
-
     artifact_labels = [
         ARTIFACTS[art]["presign_label"]
         for art in pargs.release_artifacts
@@ -406,9 +428,16 @@ def create_presign_branch(pargs):
 def create_postsign_release(pargs):
     # Obtain the hash of the current HEAD so that we can tag it.
     cur_head = get_repo_head(pargs, pargs.ot_sku_repo)
+    branch_head = target_commitish_to_sha(pargs, f"heads/{pargs.release_branch}")
+
+    if cur_head != branch_head:
+        print_warning(
+            pargs,
+            f"The ot-sku HEAD ({cur_head}) differs from the release branch head ({branch_head})"
+        )
 
     # Run a signature test check.
-    run_or_exit(pargs, f"cannot verify the signatures", [
+    run_or_exit(pargs, "cannot verify the signatures", [
         pargs.bazelisk, "test"] + pargs.bazel_opts + [
         "--test_output=streamed"] + [
             ARTIFACTS[art]["sig_test_label"] for art in pargs.release_artifacts],
@@ -447,27 +476,23 @@ def create_postsign_release(pargs):
     )
 
 
-def create_postsign_pr(pargs):
+def update_postsign_branch(pargs):
     # Important note:
     # this entire function is written in such a way that it does not need git
     # access. It only requires access the github API through `gh`.
 
     # Get asset information so that we can update the archives in the extension.
-    release_info = get_release_info(pargs)
+    release_info = get_release_info(pargs, pargs.tag)
 
     # Get the SHA of the release branch.
-    release_branch_sha = target_commitish_to_sha(pargs, pargs.tag)
+    release_branch_sha = target_commitish_to_sha(pargs, pargs.release_branch)
 
     # Get asset information.
     artifact_info = get_release_asset_info(
         pargs, release_info, {
-            ARTIFACTS[art]["presign_ext_repo"]: ARTIFACTS[art]["presign_name"]
-            for art in pargs.release_artifacts
-        } | {
             ARTIFACTS[art]["release_ext_repo"]: ARTIFACTS[art]["release_name"]
             for art in pargs.release_artifacts
         },
-        allow_no_match=True,
     )
 
     # Get the content of the original extension file.
@@ -482,7 +507,13 @@ def create_postsign_pr(pargs):
                 "url": art_info["browser_download_url"],
             } | decode_github_integrity(art_info['digest'])
             for (repo, art_info) in artifact_info.items()
-        }
+        },
+        # Keep the original presign entries (which points to the BUILD
+        # release and not the final release).
+        keep_entries=[
+            ARTIFACTS[art]["presign_ext_repo"]
+            for art in pargs.release_artifacts
+        ]
     ).encode('utf-8')
 
     # Run buildifier to make sure that it is formatted properly.
@@ -491,29 +522,26 @@ def create_postsign_pr(pargs):
         new_extension_bzl
     )
 
-    # Create a temporary branch for the PR.
-    pr_branch_name = f"{pargs.tag}-pr"
-    create_branch(pargs, release_branch_sha, pr_branch_name)
-
     # Push a commit to the branch.
     push_commit(
-        pargs, pr_branch_name,
+        pargs, pargs.release_branch,
         "Update archives for release",
         orig_extension_bzl, new_extension_bzl
     )
 
-    release_url = release_info["url"]
-    pr_body = f"""
-New artifacts have been released and added to {release_url}.
-This PR updates the extension archive references to point to those assets.
-"""
-
-    pr_info = create_pr(
-        pargs, pr_branch_name, pargs.tag,
-        f"[{pargs.tag}] Update extension to include release assets",
-        pr_body,
-    )
-    print_info(pargs, "pull request created at {}".format(pr_info["html_url"]))
+# FIXME: should we create a PR automatically?
+#     release_url = release_info["url"]
+#     pr_body = f"""
+# New artifacts have been released and added to {release_url}.
+# This PR updates the extension archive references to point to those assets.
+# """
+#
+#     pr_info = create_pr(
+#         pargs, pr_branch_name, pargs.tag,
+#         f"[{pargs.tag}] Update extension to include release assets",
+#         pr_body,
+#     )
+#     print_info(pargs, "pull request created at {}".format(pr_info["html_url"]))
 
 
 def main(argv):
@@ -563,8 +591,8 @@ def main(argv):
     )
     parser.add_argument(
         '--release-branch',
-        required=False,
-        help="name of the release branch to create (only relevant for presigning)",
+        required=True,
+        help="name of the release branch to create/update",
     )
     parser.add_argument(
         'tag',
@@ -631,6 +659,15 @@ def main(argv):
         check_repo_clean(args, "ot-sku", args.ot_sku_repo)
         check_repo_clean(args, "opentitan", args.ot_repo)
 
+    # Check if a release already exists.
+    release_list = run_gh_or_exit(args, "cannot query release list", [
+        "release", "list", "-L", "1000"]).decode('utf-8').split()
+    # The format of each line of the output is:
+    # <tag> ...
+    if any(release.split()[0] == args.tag for release in release_list):
+        print_error(args, f"release {args.tag} already exists")
+        sys.exit(1)
+
     # Find the name of the current repository if none was provided:
     if not args.release_repo:
         repo_info = run_gh_or_exit(
@@ -642,13 +679,10 @@ def main(argv):
 
     if args.pre_sign:
         create_presign_release(args)
-        if args.release_branch:
-            create_presign_branch(args)
-        else:
-            print_info(args, "no release branch specified, skipping branch creation")
+        create_presign_branch(args)
     if args.post_sign:
         create_postsign_release(args)
-        # create_postsign_pr(args)
+        update_postsign_branch(args)
 
 
 if __name__ == '__main__':
