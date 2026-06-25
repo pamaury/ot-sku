@@ -105,74 +105,6 @@ opentitan_binary(
 )
 
 offline_presigning_artifacts(
-    name = "presigning",
-    testonly = True,
-    srcs = [":rom_ext_dice_x509_prod_slot_virtual"],
-    ecdsa_key = {
-        "//open/keys/root:keyset": "ot00-earlgrey-a2-root-ecdsa-prod-0",
-    },
-    manifest = ":manifest_open",
-    spx_key = {
-        "//open/keys/root:spxset": "ot00-earlgrey-a2-root-slhdsa-prod-0",
-    },
-    tags = ["manual"],
-)
-
-pkg_tar(
-    name = "digests",
-    testonly = True,
-    srcs = [":presigning"],
-    mode = "0644",
-    tags = ["manual"],
-)
-
-offline_signature_attach(
-    name = "signed",
-    testonly = True,
-    srcs = [
-        ":presigning",
-    ],
-    ecdsa_signatures = [
-        "//open/signatures/rom_ext:ecdsa_signatures",
-    ],
-    spx_signatures = [
-        "//open/signatures/rom_ext:spx_signatures",
-    ],
-    tags = ["manual"],
-)
-
-owner_block_binary(
-    name = "owner_config_bin",
-    src = "owner.json5",
-    keys = [
-        "//open/keys/owner:all_keys",
-    ],
-    relative_to = "//:BUILD.bazel",
-)
-
-bin2c(
-    name = "owner_config",
-    src = ":owner_config_bin",
-    var_name = "open_owner",
-)
-
-cc_library(
-    name = "owner",
-    srcs = [
-        "owner.c",
-        ":owner_config",
-    ],
-    deps = [
-        "@lowrisc_opentitan//sw/device/silicon_creator/lib:boot_data",
-        "@lowrisc_opentitan//sw/device/silicon_creator/lib/drivers:flash_ctrl",
-        "@lowrisc_opentitan//sw/device/silicon_creator/lib/ownership",
-        "@lowrisc_opentitan//sw/device/silicon_creator/lib/ownership:datatypes",
-        "@lowrisc_opentitan//sw/device/silicon_creator/lib/ownership:owner_block",
-    ],
-    alwayslink = True,
-)
-
-offline_presigning_artifacts(
     name = "rom_ext",
     testonly = True,
     srcs = [":rom_ext_dice_x509_prod_slot_virtual"],
@@ -236,6 +168,37 @@ signature_test(
         "//open/keys/root:spxset": "ot00-earlgrey-a2-root-slhdsa-prod-0",
     },
     tags = ["manual"],
+)
+
+owner_block_binary(
+    name = "owner_config_bin",
+    src = "owner.json5",
+    keys = [
+        "//open/keys/owner:all_keys",
+    ],
+    relative_to = "//:BUILD.bazel",
+)
+
+bin2c(
+    name = "owner_config",
+    src = ":owner_config_bin",
+    var_name = "open_owner",
+)
+
+cc_library(
+    name = "owner",
+    srcs = [
+        "owner.c",
+        ":owner_config",
+    ],
+    deps = [
+        "@lowrisc_opentitan//sw/device/silicon_creator/lib:boot_data",
+        "@lowrisc_opentitan//sw/device/silicon_creator/lib/drivers:flash_ctrl",
+        "@lowrisc_opentitan//sw/device/silicon_creator/lib/ownership",
+        "@lowrisc_opentitan//sw/device/silicon_creator/lib/ownership:datatypes",
+        "@lowrisc_opentitan//sw/device/silicon_creator/lib/ownership:owner_block",
+    ],
+    alwayslink = True,
 )
 
 pkg_tar(
