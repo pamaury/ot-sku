@@ -27,12 +27,12 @@ on:
         options:
           - pre-sign
           - post-sign
-        default: pre-sign # <<< RELEASE_TYPE >>>
+        default: post-sign # <<< RELEASE_TYPE >>>
       release_branch:
         description: Name of the release branch to create/update
         required: true
         type: string
-        default: '' # <<< RELEASE_BRANCH >>>
+        default: release_test_3 # <<< RELEASE_BRANCH >>>
       release_notes:
         description: GitHub release notes
         required: true
@@ -48,15 +48,15 @@ on:
       artifact_rom_ext:
         description: Release the `rom_ext` artifact?
         type: boolean
-        default: true # <<< ARTIFACT_ROM_EXT >>>
+        default: false # <<< ARTIFACT_ROM_EXT >>>
       ot_repo:
         description: Opentitan repository to checkout
         type: string
-        default: lowRISC/opentitan # <<< OT_REPO >>>
+        default: pamaury/opentitan # <<< OT_REPO >>>
       ot_ref:
         description: Git branch or commit hash to checkout (opentitan)
         type: string
-        default: earlgrey_1.0.0 # <<< OT_REF >>>
+        default: sku-extra # <<< OT_REF >>>
 
 jobs:
   release:
