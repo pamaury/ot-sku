@@ -1,0 +1,80 @@
+# Copyright lowRISC contributors (OpenTitan project).
+# Licensed under the Apache License, Version 2.0, see LICENSE for details.
+# SPDX-License-Identifier: Apache-2.0
+
+name: Create a post-sign release
+on:
+  workflow_dispatch:
+    inputs:
+      presign_release_tag:
+        description: GitHub release tag of the pre-sign release
+        required: true
+        type: string
+      release_tag:
+        description: GitHub release tag
+        required: true
+        type: string
+      create_branch:
+        description: Name of the branch to create (optional)
+        required: true
+        type: string
+      release_notes:
+        description: GitHub release notes
+        required: true
+        type: string
+      release_title:
+        description: GitHub release title
+        required: true
+        type: string
+      ot_repo:
+        description: Opentitan repository to checkout
+        required: true
+        type: string
+        default: lowRISC/opentitan
+
+jobs:
+  release:
+    # Note: use the same runner as OpenTitan (see below).
+    runs-on: ubuntu-22.04
+    permissions:
+      # Necessary to create a release.
+      contents: write
+    steps:
+      - name: Checkout (ot-sku)
+        uses: actions/checkout@v6
+        with:
+          path: ot-sku
+
+      # Also checkout OT repository
+      - name: Checkout (opentitan)
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ inputs.ot_repo }}
+          fetch-depth: 0 # Bitstream cache requires all commits.
+          path: opentitan
+
+      # Install system dependencies from OpenTitan. Those are setup for Ubuntu 22.04.
+      - name: Install system dependencies
+        run: |
+          sudo apt update
+          grep '^[^#]' apt-requirements.txt | xargs sudo apt install -y
+        working-directory: opentitan
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          OT_REF=$(cd opentitan && git rev-parse HEAD)
+          RELEASE_OPTS=("--gha-console")
+          # Increase verbosity when running with debug logging.
+          if [[ "${ACTIONS_STEP_DEBUG:-}" == "true" ]]; then
+            RELEASE_OPTS+=("--verbose")
+          fi
+          ot-sku/scripts/release.py \
+            ${RELEASE_OPTS[@]} \
+            --post-sign="${{ inputs.presign_release_tag }}" \
+            --ot-repo opentitan \
+            --create-branch "${{ inputs.create_branch }}" \
+            --release-title "${{ inputs.release_title }}" \
+            --release-notes "${{ inputs.release_notes }}" \
+            "${{ inputs.release_tag }}"
