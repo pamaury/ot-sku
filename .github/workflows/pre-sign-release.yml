@@ -2,17 +2,7 @@
 # Licensed under the Apache License, Version 2.0, see LICENSE for details.
 # SPDX-License-Identifier: Apache-2.0
 
-# Important note:
-# this workflow is typically ran twice: the first time for a
-# pre-signing release and a second time for post-signing release.
-# To avoid user errors and enforce reproducibility, this file is
-# set up for a pre-signing workflow in the main branch and is
-# MODIFIED by the flow itself in release branches so that it becomes
-# set up for a post-sigining release. This is done by changing the
-# inputs parameters below. The anchors (<<< ANCHOR >>>) must not
-# be removed, they are used to locate lines to change.
-
-name: Create a release
+name: Create a pre-sign release
 on:
   workflow_dispatch:
     inputs:
@@ -20,19 +10,10 @@ on:
         description: GitHub release tag
         required: true
         type: string
-      release_type:
-        description: Release type
-        required: true
-        type: choice
-        options:
-          - pre-sign
-          - post-sign
-        default: pre-sign # <<< RELEASE_TYPE >>>
-      release_branch:
-        description: Name of the release branch to create/update
+      create_branch:
+        description: Name of the branch to create (optional)
         required: true
         type: string
-        default: '' # <<< RELEASE_BRANCH >>>
       release_notes:
         description: GitHub release notes
         required: true
@@ -45,27 +26,30 @@ on:
         description: Release the `perso` artifact?
         required: true
         type: boolean
-        default: true # <<< ARTIFACT_PERSO >>>
+        default: true
       artifact_rom_ext:
         description: Release the `rom_ext` artifact?
         required: true
         type: boolean
-        default: true # <<< ARTIFACT_ROM_EXT >>>
+        default: true
       ot_repo:
         description: Opentitan repository to checkout
         required: true
         type: string
-        default: lowRISC/opentitan # <<< OT_REPO >>>
+        default: lowRISC/opentitan
       ot_ref:
         description: Git branch or commit hash to checkout (opentitan)
         required: true
         type: string
-        default: earlgrey_1.0.0 # <<< OT_REF >>>
+        default: earlgrey_1.0.0
 
 jobs:
   release:
     # Note: use the same runner as OpenTitan (see below).
     runs-on: ubuntu-22.04
+    permissions:
+      # Necessary to create a release.
+      contents: write
     steps:
       - name: Checkout (ot-sku)
         uses: actions/checkout@v6
@@ -90,8 +74,7 @@ jobs:
 
       - name: Create release
         env:
-          # TODO document
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           OT_REF=$(cd opentitan && git rev-parse HEAD)
           RELEASE_OPTS=("--gha-console")
@@ -110,34 +93,11 @@ jobs:
           then
             RELEASE_OPTS+=("--release-artifacts" "perso")
           fi
-          if [[ "${{ inputs.release_type}}" == "pre-sign" ]]; then
-            RELEASE_OPTS+=("--pre-sign")
-            # Modify the release flow
-            RELEASE_OPTS+=(
-                "--edit-workflow"
-                "RELEASE_TYPE=post-sign"
-                "--edit-workflow"
-                "RELEASE_BRANCH=${{ inputs.release_branch }}"
-                "--edit-workflow"
-                "OT_REPO=${{ inputs.ot_repo }}"
-                "--edit-workflow"
-                "OT_REF=$OT_REF"
-                "--edit-workflow"
-                "ARTIFACT_PERSO=$ARTIFACT_PERSO"
-                "--edit-workflow"
-                "ARTIFACT_ROM_EXT=$ARTIFACT_ROM_EXT"
-            )
-
-          elif [[ "${{ inputs.release_type}}" == "post-sign" ]]; then
-            RELEASE_OPTS+=("--post-sign")
-          else
-            print "::error::invalid release type '${{ inputs.release_type}}'"
-            exit 1
-          fi
           ot-sku/scripts/release.py \
             ${RELEASE_OPTS[@]} \
+            --pre-sign \
             --ot-repo opentitan \
-            --release-branch "${{ inputs.release_branch }}" \
+            --create-branch "${{ inputs.create_branch }}" \
             --release-title "${{ inputs.release_title }}" \
             --release-notes "${{ inputs.release_notes }}" \
             "${{ inputs.release_tag }}"
