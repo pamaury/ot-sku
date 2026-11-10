@@ -65,12 +65,11 @@ jobs:
           fetch-depth: 0 # Bitstream cache requires all commits.
           path: opentitan
 
-      # Install system dependencies from OpenTitan. Those are setup for Ubuntu 22.04.
-      - name: Install system dependencies
-        run: |
-          sudo apt update
-          grep '^[^#]' apt-requirements.txt | xargs sudo apt install -y
-        working-directory: opentitan
+      # Prepare environment using OpenTitan's CI action.
+      - name: Prepare environment
+        uses: ./opentitan/.github/actions/prepare-env
+        with:
+          working-directory: opentitan
 
       - name: Create release
         env:
